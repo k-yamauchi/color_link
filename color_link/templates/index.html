@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カラーリンク - パズル対戦ゲーム</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>カラーリンク</h1>
+            <p>色の組み合わせを予想して、少ない手数でゴールを目指そう！</p>
+        </header>
+
+        <div class="game-controls">
+            <div class="control-group">
+                <label for="sequence-length">シーケンス長:</label>
+                <select id="sequence-length">
+                    <option value="3" selected>3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="game-mode">ゲームモード:</label>
+                <select id="game-mode">
+                    <option value="normal" selected>通常モード</option>
+                    <option value="eval">エージェント評価モード</option>
+                    <option value="train">強化学習トレーニングモード</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="ai-type">AIタイプ:</label>
+                <select id="ai-type">
+                    <option value="none">なし</option>
+                    <option value="rule">ルールベース</option>
+                    <option value="rl">強化学習</option>
+                    <option value="hybrid">ハイブリッド</option>
+                </select>
+            </div>
+
+            <div class="control-group" id="ai-options" style="display: none;">
+                <label for="ai-delay">AI速度:</label>
+                <input type="range" id="ai-delay" min="500" max="3000" step="100" value="1000">
+                <span id="delay-value">1.0秒</span>
+            </div>
+
+            <div class="control-group" id="rl-options" style="display: none;">
+                <label for="learning-mode">
+                    <input type="checkbox" id="learning-mode">
+                    学習モード
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label for="debug-mode">
+                    <input type="checkbox" id="debug-mode">
+                    デバッグモード
+                </label>
+            </div>
+
+            <button id="new-game">新しいゲーム</button>
+            <button id="ai-move" disabled>AI行動</button>
+        </div>
+
+        <!-- エージェント評価モードの設定パネル -->
+        <div id="eval-panel" class="eval-panel" style="display: none;">
+            <h3>エージェント評価モード</h3>
+            <div class="eval-settings">
+                <div class="control-group">
+                    <label for="eval-games">ゲーム数:</label>
+                    <input type="number" id="eval-games" min="1" max="100" value="10">
+                </div>
+                <div class="control-group">
+                    <label for="eval-seq-length">シーケンス長:</label>
+                    <select id="eval-seq-length">
+                        <option value="3" selected>3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                </div>
+                <div class="control-group agent-select-group">
+                    <label>評価するエージェント:</label>
+                    <div class="agent-checkboxes">
+                        <div class="agent-checkbox">
+                            <input type="checkbox" id="eval-rule-agent" checked>
+                            <label for="eval-rule-agent">ルールベース</label>
+                        </div>
+                        <div class="agent-checkbox">
+                            <input type="checkbox" id="eval-rl-agent">
+                            <label for="eval-rl-agent">強化学習</label>
+                        </div>
+                        <div class="agent-checkbox">
+                            <input type="checkbox" id="eval-hybrid-agent">
+                            <label for="eval-hybrid-agent">ハイブリッド</label>
+                        </div>
+                    </div>
+                </div>
+                <button id="start-eval">評価開始</button>
+                <button id="stop-eval" disabled>評価停止</button>
+            </div>
+            <div class="eval-results">
+                <h4>評価結果</h4>
+                <div id="eval-stats">
+                    <p>勝率: <span id="win-rate">-</span></p>
+                    <p>平均ターン数: <span id="avg-turns">-</span></p>
+                    <p>最小ターン数: <span id="min-turns">-</span></p>
+                </div>
+                <div id="eval-progress">
+                    <p>進捗: <span id="progress-value">0/0</span></p>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- エージェント比較結果 -->
+            <div class="eval-comparison" id="eval-comparison" style="display: none;">
+                <h4>エージェント比較</h4>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>エージェント</th>
+                            <th>勝率</th>
+                            <th>平均ターン</th>
+                            <th>最小ターン</th>
+                        </tr>
+                    </thead>
+                    <tbody id="comparison-results">
+                        <!-- 比較結果がここに表示される -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 強化学習トレーニングモードの設定パネル -->
+        <div id="train-panel" class="train-panel" style="display: none;">
+            <h3>強化学習トレーニングモード</h3>
+            <div class="train-settings">
+                <div class="control-group">
+                    <label for="train-episodes">エピソード数:</label>
+                    <input type="number" id="train-episodes" min="1" max="1000" value="100">
+                </div>
+                <div class="control-group">
+                    <label for="train-seq-length">シーケンス長:</label>
+                    <select id="train-seq-length">
+                        <option value="3" selected>3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="train-agent-type">エージェントタイプ:</label>
+                    <select id="train-agent-type">
+                        <option value="rl" selected>強化学習</option>
+                        <option value="hybrid">ハイブリッド</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="train-exploration">探索率:</label>
+                    <input type="range" id="train-exploration" min="0.1" max="0.9" step="0.1" value="0.5">
+                    <span id="exploration-value">0.5</span>
+                </div>
+                <button id="start-train">トレーニング開始</button>
+                <button id="stop-train" disabled>トレーニング停止</button>
+                <button id="save-model">モデル保存</button>
+            </div>
+            <div class="train-results">
+                <h4>トレーニング状況</h4>
+                <div id="train-stats">
+                    <p>完了エピソード: <span id="completed-episodes">0</span></p>
+                    <p>勝率: <span id="train-win-rate">0%</span></p>
+                    <p>平均報酬: <span id="avg-reward">0</span></p>
+                </div>
+                <div id="train-progress">
+                    <p>進捗: <span id="train-progress-value">0/0</span></p>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="train-log-container">
+                    <h4>トレーニングログ</h4>
+                    <div id="train-log" class="train-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="game-container">
+            <div class="board-container">
+                <div class="target-sequence" id="target-sequence">
+                    <h3>目標シーケンス（上から順）</h3>
+                    <div class="sequence-cells"></div>
+                </div>
+                
+                <div class="game-board" id="game-board"></div>
+                
+                <div class="color-selector">
+                    <h3>色を選択</h3>
+                    <div class="color-buttons">
+                        <button class="color-btn" data-color="red" style="background-color: #e53935;"></button>
+                        <button class="color-btn" data-color="blue" style="background-color: #1e88e5;"></button>
+                        <button class="color-btn" data-color="yellow" style="background-color: #fdd835;"></button>
+                        <button class="color-btn" data-color="green" style="background-color: #43a047;"></button>
+                        <button class="color-btn" data-color="purple" style="background-color: #8e24aa;"></button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="history-container">
+                <h3>履歴</h3>
+                <div class="history-list" id="history-list"></div>
+            </div>
+        </div>
+        
+        <div class="message-box" id="message-box"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html> 
